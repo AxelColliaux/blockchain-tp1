@@ -24,6 +24,11 @@ contract MyToken is IERC20 {
     //   - InsufficientAllowance(uint256 available, uint256 required)
     //   - ZeroAddress() : transfert vers address(0)
     //   - ZeroAmount() : montant nul
+    error Unauthorized();
+    error InsufficientBalance(uint256 available, uint256 required);
+    error InsufficientAllowance(uint256 available, uint256 required);
+    error ZeroAddress();
+    error ZeroAmount();
 
     // ── Events supplémentaires ─────────────────────────────────────
     event OwnershipTransferred(
@@ -34,6 +39,12 @@ contract MyToken is IERC20 {
     // ── Modificateurs ──────────────────────────────────────────────
     // TODO 2 : Déclarer le modifier onlyOwner
     //   qui reverte avec Unauthorized() si msg.sender != owner
+    modifier onlyOwner() {
+        if (msg.sender != owner) {
+            revert Unauthorized();
+        }
+        _;
+    }
 
     // ── Constructor ────────────────────────────────────────────────
     constructor(
@@ -44,6 +55,12 @@ contract MyToken is IERC20 {
     ) {
         // TODO 3 : Initialiser name, symbol, decimals, owner (= msg.sender)
         // puis appeler _mint(msg.sender, _initialSupply)
+        name = _name;
+        symbol = _symbol;
+        decimals = _decimals;
+        owner = msg.sender;
+
+        _mint(msg.sender, _initialSupply);
     }
 
     // ── Fonctions ERC-20 publiques ─────────────────────────────────
@@ -54,6 +71,12 @@ contract MyToken is IERC20 {
         // TODO 4 : Vérifier to != address(0) (revert ZeroAddress)
         // puis appeler _transfer(msg.sender, to, amount)
         // retourner true
+        if (to == address(0)) {
+            revert ZeroAddress();
+        }
+
+        _transfer(msg.sender, to, amount);
+        return true;
     }
 
     function approve(
@@ -64,6 +87,14 @@ contract MyToken is IERC20 {
         // Mettre à jour allowance[msg.sender][spender]
         // Émettre Approval(msg.sender, spender, amount)
         // retourner true
+        if (spender == address(0)) {
+            revert ZeroAddress();
+        }
+
+        allowance[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+
+        return true;
     }
 
     function transferFrom(
@@ -82,6 +113,24 @@ contract MyToken is IERC20 {
         //    (avec unchecked)
         // 4. Appeler _transfer(from, to, amount)
         // 5. Retourner true
+        if (to == address(0)) {
+            revert ZeroAddress();
+        }
+
+        uint256 allowed = allowance[from][msg.sender];
+
+        if (allowed != type(uint256).max) {
+            if (allowed < amount) {
+                revert InsufficientAllowance(allowed, amount);
+            }
+
+            unchecked {
+                allowance[from][msg.sender] = allowed - amount;
+            }
+        }
+
+        _transfer(from, to, amount);
+        return true;
     }
 
     // ── Fonctions admin ────────────────────────────────────────────
@@ -90,10 +139,12 @@ contract MyToken is IERC20 {
         uint256 amount
     ) external onlyOwner {
         // TODO 7 : Appeler _mint(to, amount)
+        _mint(to, amount);
     }
 
     function burn(uint256 amount) external {
         // TODO 8 : Appeler _burn(msg.sender, amount)
+        _burn(msg.sender, amount);
     }
 
     function transferOwnership(
@@ -102,6 +153,12 @@ contract MyToken is IERC20 {
         // TODO 9 : Vérifier newOwner != address(0)
         // Émettre OwnershipTransferred(owner, newOwner)
         // Mettre à jour owner
+        if (newOwner == address(0)) {
+            revert ZeroAddress();
+        }
+
+        emit OwnershipTransferred(owner, newOwner);
+        owner = newOwner;
     }
 
     // ── Fonctions internes (FOURNIES — ne pas modifier) ───────────
